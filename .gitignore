@@ -1,0 +1,4 @@
+settings.toml
+*.session
+poetry.lock
+__pycache__/
