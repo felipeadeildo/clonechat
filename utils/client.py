@@ -49,6 +49,6 @@ async def get_client(
         code = input('Enter code: ')
         await client.sign_in(phone, code)
 
-    await client.start()  # type: ignore
-    
+    await client.start()  # type: ignore [call-start is awaitable]
+
     return client
