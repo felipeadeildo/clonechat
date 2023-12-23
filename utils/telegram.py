@@ -2,6 +2,9 @@ from telethon import TelegramClient
 from telethon.tl.types import Channel
 
 
+# TODO: Create a abstract class for clonable inputs entities, implementing methods to copy, forward, etc.
+# the ideia is: instead use `get_entity`, encapsulate the entity (chat or path) and implemente function to use by controller.
+# so, the get_chat will return other type.
 async def get_chat(client: TelegramClient, chat_id: int) -> Channel:
     """Get a clonable chat entity by ID.
 

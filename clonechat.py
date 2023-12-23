@@ -1,4 +1,6 @@
 import asyncio
+from pathlib import Path
+from typing import Union
 
 from telethon import TelegramClient
 from telethon.tl.patched import Message
@@ -15,16 +17,34 @@ class CloneChat:
         clone(self): Clone Target Chat to Output Chat
     """
 
-    def __init__(self, client: TelegramClient, target_id: int, output_id: int):
+    def __init__(self, client: TelegramClient, input_id: Union[int, Path],
+                 output_id: Union[int, Path]):
+        """Initialize the controller
+
+        Args:
+            client (TelegramClient): The client to use for the API call.
+            input_id (Union[int, Path]): if `int`: The ID of the chat to clone. 
+                if `Path`: A dumpped chat folder containing dump.db file.
+            output_id (Union[int, Path]): if `int`: The ID of the chat to send cloned messages.
+                if `Path`: A dumpped chat to dump the chat into dump.db file.
+        """
         self.client = client
-        self.target_id = target_id
+        self.input_id = input_id
         self.output_id = output_id
 
     async def __get_chats(self):
         """Initialize Target and Output Chat"""
-        self.target = await get_chat(self.client, self.target_id)
-        self.output = await get_chat(self.client, self.output_id)
-        del self.target_id, self.output_id
+        if isinstance(self.input_id, Path):
+            self.input = ...
+        else:
+            self.input = await get_chat(self.client, self.input_id)
+
+        if isinstance(self.output_id, Path):
+            self.output = ...
+        else:
+            self.output = await get_chat(self.client, self.output_id)
+
+        del self.input_id, self.output_id
 
     async def clone(self):
         """Start the clonation process"""
@@ -38,29 +58,27 @@ class CloneChat:
         Args:
             message (Message): The message to be cloned
         """
-
-        clone_methods = {
-            'forward': ...,
-            'download': ...,
-        }
-
-        # TODO: Add conditionals to choice the clone method.
+        # TODO: Implement clonator calling the `self.target` and `self.output` methods.
+        pass
 
     async def __clone_messages(self):
         """Iterate over messages and call the wrapper clonator method."""
-        messages = self.client.iter_messages(self.target)
+        # TODO: Implement an iterator here independent of the `self.input`
 
-        async for message in messages:
-            await self.__clone_message(message)
-            break
+        # messages = self.client.iter_messages(self.input)
+        # async for message in messages:
+        #     await self.__clone_message(message)
+        #     break
+        pass
 
 
 async def main():
     args = get_args()
-    target_id, output_id = args.i, args.o
+    input_id, output_id = args.input, args.output
+
     client = await get_client()
 
-    await CloneChat(client, target_id, output_id).clone()
+    await CloneChat(client, input_id, output_id).clone()
 
 
 if __name__ == "__main__":
