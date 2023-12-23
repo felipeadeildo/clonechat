@@ -1,25 +1,7 @@
-from functools import wraps
-from typing import Callable
-
 from telethon import TelegramClient
 from telethon.tl.types import Channel
 
 
-def high_order_function(function: Callable):
-
-    @wraps(function)
-    def super_wrapper(client: TelegramClient):
-
-        @wraps(function)
-        async def wrapper(*args, **kwargs):
-            return await function(client, *args, **kwargs)
-
-        return wrapper
-
-    return super_wrapper
-
-
-@high_order_function
 async def get_chat(client: TelegramClient, chat_id: int) -> Channel:
     """Get a clonable chat entity by ID.
 
