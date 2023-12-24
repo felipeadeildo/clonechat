@@ -36,24 +36,25 @@ class Target(ABC):
         ...
 
     @abstractmethod
-    def __convert_to_universal_message(self, message: Union[dict, Message]):
+    def _convert_to_universal_message(self, message: Union[dict, Message]):
         """Convert a message to [UniversalMessage]
 
         Args:
             message (Union[dict, Message]): The message to convert. 
                 Is a dict if from `DumpChat`, else from `Chat`.
         """
-        ...
+        pass
 
 
 class Chat(Target):
 
-    async def __init__(self, client: TelegramClient, chat_id: int):
+    def __init__(self, client: TelegramClient, chat_id: int, chat_entity: ...):
         super().__init__(client, chat_id)
-        self.target = await self.__get_telegram_chat()
+        self.target = chat_entity
 
-    async def __get_telegram_chat(self) -> Channel:
-        """Get a clonable chat entity by ID.
+    @classmethod
+    async def create(cls, client: TelegramClient, chat_id: int):
+        """Create a new Chat Instance
 
         Args:
             client (TelegramClient): The client to use for the API call.
@@ -65,20 +66,20 @@ class Chat(Target):
         Raises:
             ValueError: If the entity is not a clonable chat.
         """
-        entity = await self.client.get_entity(self.target_id)  # type: ignore
-        if not isinstance(entity, (Channel, )):
+        chat_entity = await client.get_entity(chat_id)
+        if not isinstance(chat_entity, (Channel, )):
             raise ValueError("Entity is not Clonable Chat")
-        return entity
+        return cls(client, chat_id, chat_entity)
 
-    def __convert_to_universal_message(self, message: Union[dict, Message]):
-        return super().__convert_to_universal_message(message)
+    def _convert_to_universal_message(self, message: Union[dict, Message]):
+        return UniversalMessage()
 
     async def iter_messages(self):
         async for message in self.client.iter_messages(self.target):
-            yield self.__convert_to_universal_message(message)
+            yield self._convert_to_universal_message(message)
 
     async def send_message(self, message: UniversalMessage):
-        return super().send_message(message)
+        ...
 
 
 class DumpChat(Target):
@@ -100,7 +101,7 @@ class DumpChat(Target):
         self.__set_db_connection()
         # TODO: Write a SQL script to create the schema
 
-    def __convert_to_universal_message(self, message: dict):
+    def _convert_to_universal_message(self, message: dict):
         # TODO: Write the conversion (it depends of schema)
         return UniversalMessage()
 
@@ -111,13 +112,14 @@ class DumpChat(Target):
             message = await loop.run_in_executor(None, self.__cursor.fetchone)
             if message is None:
                 break
-            yield self.__convert_to_universal_message(message)
+            yield self._convert_to_universal_message(message)
 
     async def send_message(self, message: UniversalMessage):
         return super().send_message(message)
 
 
-def get_target(client: TelegramClient, target_id: Union[int, Path]) -> Target:
+async def get_target(client: TelegramClient,
+                     target_id: Union[int, Path]) -> Union[DumpChat, Chat]:
     """Get a target object by ID
 
     Args:
@@ -130,4 +132,4 @@ def get_target(client: TelegramClient, target_id: Union[int, Path]) -> Target:
     if isinstance(target_id, Path):
         return DumpChat(client, target_id)
     else:
-        return Chat(client, target_id)
+        return await Chat.create(client, target_id)

@@ -34,8 +34,8 @@ class CloneChat:
 
     async def __get_targets(self):
         """Initialize Target and Output Chat"""
-        self.input = get_target(self.client, self.input_id)
-        self.output = get_target(self.client, self.output_id)
+        self.input = await get_target(self.client, self.input_id)
+        self.output = await get_target(self.client, self.output_id)
 
     async def clone(self):
         """Start the clonation process"""
