@@ -46,6 +46,8 @@ class CloneChat:
         """Iterate over messages and call the wrapper clonator method."""
 
         async for message in self.input.iter_messages():
+            if message.file:
+                await message.file.download_media(self.client)
             await self.output.send_message(message)
 
 

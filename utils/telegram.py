@@ -3,15 +3,58 @@ from abc import abstractmethod
 import asyncio
 from pathlib import Path
 import sqlite3
-from typing import AsyncGenerator, Union
+from typing import AsyncGenerator, Optional, Union
 
 from telethon import TelegramClient
+from telethon.tl.patched import MessageService
 from telethon.tl.types import Channel
+from telethon.tl.types import DocumentAttributeFilename
+from telethon.tl.types import DocumentEmpty
+from telethon.tl.types import InputDocumentFileLocation
 from telethon.tl.types import Message
+from telethon.tl.types import MessageMediaDocument
+
+# TODO: Add Verbose on Actions (sent, iter, download, etc...)
+
+
+class UniversalMedia:
+    """Universal Media Representation"""
+
+    def __init__(self, file_name: str, file_path: Optional[Path] = None, **kw):
+        self.file_name = file_name
+        self.file_path = file_path
+        self.id = kw.get('id')
+        self.access_hash = kw.get('access_hash')
+        self.file_reference = kw.get('file_reference')
+        if isinstance(self.file_reference, str):
+            self.file_reference = self.file_reference.encode('utf-8')
+
+    async def download_media(self, client: TelegramClient):
+        """Use the client to download the media.
+
+        Args:
+            client (TelegramClient): The client to use for the API call.
+        """
+        if any(v is None
+               for v in (self.id, self.access_hash, self.file_reference)):
+            return None
+
+        id, access_hash, file_reference = (getattr(self, k)
+                                           for k in ('id', 'access_hash',
+                                                     'file_reference'))
+        input_file = InputDocumentFileLocation(id, access_hash, file_reference,
+                                               '')
+        self.file_path = self.file_name  # TODO: Change This to a proper path
+        await client.download_file(input_file, str(self.file_path))
 
 
 class UniversalMessage:
-    ...
+
+    def __init__(self,
+                 message: str = '',
+                 file: Optional[UniversalMedia] = None):
+        self.message = message
+        self.file = file
 
 
 class Target(ABC):
@@ -36,7 +79,7 @@ class Target(ABC):
         ...
 
     @abstractmethod
-    def _convert_to_universal_message(self, message: Union[dict, Message]):
+    def _get_universal_message(self, message: Union[dict, Message]):
         """Convert a message to [UniversalMessage]
 
         Args:
@@ -71,15 +114,77 @@ class Chat(Target):
             raise ValueError("Entity is not Clonable Chat")
         return cls(client, chat_id, chat_entity)
 
-    def _convert_to_universal_message(self, message: Union[dict, Message]):
-        return UniversalMessage()
+    def _get_universal_media(
+        self,
+        media: "MediaMessage"  # type: ignore [abstract constructor]
+    ) -> Union[UniversalMedia, None]:
+        """Convert a message media to UniversalMedia
+
+        Args:
+            media (MessageMedia): The message media to convert.
+
+        Returns:
+            Union[UniversalMedia, None]: UniversalMedia if media is not empty.
+        """
+        data = {}
+        if isinstance(media, MessageMediaDocument):
+            if isinstance(media.document, DocumentEmpty) or not media.document:
+                return None
+
+            fname_attr = next((attr for attr in media.document.attributes
+                               if isinstance(attr, DocumentAttributeFilename)),
+                              None)
+
+            data["file_name"] = fname_attr.file_name if fname_attr else None
+            data["id"] = media.document.id
+            data["access_hash"] = media.document.access_hash
+            data["file_reference"] = media.document.file_reference
+        else:
+            return None
+
+        return UniversalMedia(**data)
+
+    def _get_universal_message(self, message: Union[dict, Message]):
+        """Convert a message to UniversalMessage
+
+        Args:
+            message (Union[dict, Message]): The message to convert.
+
+        Returns:
+            UniversalMessage: The converted message.
+        """
+        if isinstance(message, dict):
+            return UniversalMessage(**message)
+
+        message_data = {}
+        message_data["message"] = message.message
+        if message.media:
+            message_data["file"] = self._get_universal_media(message.media)
+
+        return UniversalMessage(**message_data)
 
     async def iter_messages(self):
         async for message in self.client.iter_messages(self.target):
-            yield self._convert_to_universal_message(message)
+            if isinstance(message, MessageService):
+                continue
+            yield self._get_universal_message(message)
 
-    async def send_message(self, message: UniversalMessage):
-        ...
+    async def send_message(self, message: UniversalMessage) -> Message:
+        """Send a message to save on target.
+
+        Args:
+            message (UniversalMessage): The message to send.
+
+        Returns:
+            Message: Telegram Message Object
+        """
+        if not message.file:
+            return await self.client.send_message(self.target, message.message)
+        else:
+            await message.file.download_media(self.client)
+            return await self.client.send_file(self.target,
+                                               str(message.file.file_path),
+                                               caption=message.message)
 
 
 class DumpChat(Target):
@@ -101,7 +206,7 @@ class DumpChat(Target):
         self.__set_db_connection()
         # TODO: Write a SQL script to create the schema
 
-    def _convert_to_universal_message(self, message: dict):
+    def _get_universal_message(self, message: dict):
         # TODO: Write the conversion (it depends of schema)
         return UniversalMessage()
 
@@ -112,7 +217,7 @@ class DumpChat(Target):
             message = await loop.run_in_executor(None, self.__cursor.fetchone)
             if message is None:
                 break
-            yield self._convert_to_universal_message(message)
+            yield self._get_universal_message(message)
 
     async def send_message(self, message: UniversalMessage):
         return super().send_message(message)
