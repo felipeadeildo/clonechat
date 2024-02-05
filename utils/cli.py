@@ -13,7 +13,7 @@ def __argtype(value: str) -> Union[int, Path]:
         int: If the value can be converted to int, returns the value.
             This int can be a `chat_id`.
         Path: If the value can be converted to Path, returns the value.
-            This Path can be a `foldername` of a dumpped chat. 
+            This Path can be a `foldername` of a dumpped chat.
     """
     try:
         return int(value)
@@ -30,19 +30,19 @@ def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Telegram Clone Chat")
 
     parser.add_argument(
-        '--input',
+        "--input",
         metavar="INPUT",
         type=__argtype,
-        help=
-        "Target Chat ID like -100123456/@channelname or a dumpped chat folder containing dump.db file.",
-        required=True)
+        help="Target Chat ID like -100123456/@channelname or a dumpped chat folder containing dump.db file.",
+        required=True,
+    )
     parser.add_argument(
-        '--output',
+        "--output",
         metavar="OUTPUT",
         type=__argtype,
-        help=
-        "Output Chat ID like -100123456/@channelname or a foldername to dump the chat into dump.db file.",
-        required=True)
+        help="Output Chat ID like -100123456/@channelname or a foldername to dump the chat into dump.db file.",
+        required=True,
+    )
 
     args = parser.parse_args()
 

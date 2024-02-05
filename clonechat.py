@@ -3,27 +3,28 @@ from pathlib import Path
 from typing import Union
 
 from telethon import TelegramClient
-from telethon.tl.patched import Message
 
-from utils import get_args
-from utils import get_client
-from utils import get_target
+from utils import get_args, get_client, get_target
 
 
 class CloneChat:
     """Controller for CloneChat
-    
+
     Methods:
         clone(self): Clone Target Chat to Output Chat
     """
 
-    def __init__(self, client: TelegramClient, input_id: Union[int, Path],
-                 output_id: Union[int, Path]):
+    def __init__(
+        self,
+        client: TelegramClient,
+        input_id: Union[int, Path],
+        output_id: Union[int, Path],
+    ):
         """Initialize the controller
 
         Args:
             client (TelegramClient): The client to use for the API call.
-            input_id (Union[int, Path]): if `int`: The ID of the chat to clone. 
+            input_id (Union[int, Path]): if `int`: The ID of the chat to clone.
                 if `Path`: A dumpped chat folder containing dump.db file.
             output_id (Union[int, Path]): if `int`: The ID of the chat to send cloned messages.
                 if `Path`: A dumpped chat to dump the chat into dump.db file.
@@ -46,8 +47,6 @@ class CloneChat:
         """Iterate over messages and call the wrapper clonator method."""
 
         async for message in self.input.iter_messages():
-            if message.file:
-                await message.file.download_media(self.client)
             await self.output.send_message(message)
 
 
