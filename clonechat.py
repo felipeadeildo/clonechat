@@ -46,7 +46,7 @@ class CloneChat:
     async def __clone_messages(self):
         """Iterate over messages and call the wrapper clonator method."""
 
-        async for message in self.input.iter_messages():
+        async for message in self.input.iter_messages():  # type: ignore
             await self.output.send_message(message)
 
 

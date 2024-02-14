@@ -6,74 +6,39 @@ from typing import AsyncGenerator, Optional, Union
 
 from telethon import TelegramClient
 from telethon.tl.patched import MessageService
-from telethon.tl.types import (
-    Channel,
-    DocumentAttributeFilename,
-    DocumentEmpty,
-    InputDocumentFileLocation,
-    InputPhotoFileLocation,
-    Message,
-    MessageMediaDocument,
-    MessageMediaPhoto,
-)
+from telethon.tl.types import Channel, Message
+
+from utils.base import create_callback
 
 # TODO: Add Verbose on Actions (sent, iter, download, etc...)
-
-
-class UniversalMedia:
-    """Universal Media Representation"""
-
-    def __init__(self, file_name: str, file_path: Optional[Path] = None, **kw):
-        from utils.base import create_callback
-
-        self.file_name = file_name
-        self.file_path = file_path
-        self.id = kw.get("id")
-        self.access_hash = kw.get("access_hash")
-        self.file_reference = kw.get("file_reference")
-        self.is_photo = kw.get("is_photo", False)
-        self.total_bytes = kw.get("total_bytes", None)
-        self.download_callback = create_callback(self)
-        if isinstance(self.file_reference, str):
-            self.file_reference = self.file_reference.encode("utf-8")
-
-    async def download_media(self, client: TelegramClient):
-        """Use the client to download the media.
-
-        Args:
-            client (TelegramClient): The client to use for the API call.
-        """
-        if any(not v for v in (self.id, self.access_hash, self.file_reference)):
-            return None
-
-        id, access_hash, file_reference = (
-            getattr(self, k) for k in ("id", "access_hash", "file_reference")
-        )
-        input_cls = (
-            InputPhotoFileLocation
-            if self.is_photo
-            else InputDocumentFileLocation
-        )
-        input_file = input_cls(id, access_hash, file_reference, "")
-        if not self.file_path:
-            self.file_path = self.file_name  # TODO: change thin in the init
-
-        await client.download_file(
-            input_file,
-            str(self.file_path),
-            progress_callback=self.download_callback,
-            file_size=self.total_bytes,
-        )
 
 
 class UniversalMessage:
     """Universal Message Representation"""
 
     def __init__(
-        self, message: str = "", file: Optional[UniversalMedia] = None
+        self,
+        client: TelegramClient,
+        chat_id: int,
+        message_id: int,
+        retrieve: bool = True,
+        **kw
     ):
-        self.message = message
-        self.file = file
+        self.client = client
+        self.chat_id = chat_id
+        self.message_id = message_id
+        self.message: Message | None = None
+        for k, v in kw.items():
+            setattr(self, k, v)
+        if retrieve:
+            asyncio.run(self.retrieve_message())
+
+    async def retrieve_message(self):
+        _message = await self.client.get_messages(
+            self.chat_id, ids=self.message_id
+        )
+        if _message:
+            self.message = _message[0]
 
 
 class Target(ABC):
@@ -108,7 +73,7 @@ class Target(ABC):
         raise NotImplemented
 
 
-class Chat(Target):
+class TgChat(Target):
 
     def __init__(self, client: TelegramClient, chat_id: int, chat_entity: ...):
         super().__init__(client, chat_id)
@@ -133,92 +98,28 @@ class Chat(Target):
             raise ValueError("Entity is not Clonable Chat")
         return cls(client, chat_id, chat_entity)
 
-    async def _get_universal_media(
-        self, media: "MediaMessage"  # type: ignore [abstract constructor]
-    ) -> Union[UniversalMedia, None]:
-        """Convert a message media to UniversalMedia
-
-        Args:
-            media (MessageMedia): The message media to convert.
-
-        Returns:
-            Union[UniversalMedia, None]: UniversalMedia if media is not empty.
-        """
-        data = {}
-        # should i use match case? ho ho ho
-        if isinstance(media, MessageMediaDocument):
-            property = "document"
-        elif isinstance(media, MessageMediaPhoto):
-            property = "photo"
-        else:
-            return None
-
-        property_value = getattr(media, property)
-        if isinstance(property_value, DocumentEmpty) or not property_value:
-            return None
-
-        fname_attr = next(
-            (
-                attr
-                for attr in getattr(property_value, "attributes", [])
-                if isinstance(attr, DocumentAttributeFilename)
-            ),
-            None,
-        )
-
-        if not fname_attr or property == "photo":
-            filename = f"{property_value.id}.jpg"
-        else:
-            filename = fname_attr.file_name
-
-        if property == "document":
-            file_size = property_value.size
-        elif property == "photo":
-            file_size = next(
-                size.size
-                for size in property_value.sizes
-                if getattr(size, "size", None)
-            )
-        else:
-            file_size = 1  # just for type checking
-
-        data["file_name"] = filename
-        data["id"] = property_value.id
-        data["access_hash"] = property_value.access_hash
-        data["file_reference"] = property_value.file_reference
-        data["is_photo"] = property == "photo"
-        data["total_bytes"] = file_size
-
-        return UniversalMedia(**data)
-
-    async def _get_universal_message(self, message: Union[dict, Message]):
-        """Convert a message to UniversalMessage
-
-        Args:
-            message (Union[dict, Message]): The message to convert.
-
-        Returns:
-            UniversalMessage: The converted message.
-        """
+    def _get_universal_message(self, message: dict | Message):
+        chat_id = int(getattr(self, "target_id"))
         if isinstance(message, dict):
-            return UniversalMessage(**message)
-
-        message_data = {}
-        message_data["message"] = message.message
-        if message.media:
-            message_data["file"] = await self._get_universal_media(
-                message.media
+            return UniversalMessage(self.client, chat_id, message["id"])
+        else:
+            return UniversalMessage(
+                self.client,
+                chat_id,
+                message.id,
+                retrieve=False,
+                message=message,
             )
-
-        return UniversalMessage(**message_data)
 
     async def iter_messages(self):
         async for message in self.client.iter_messages(self.target):
             if isinstance(message, MessageService):
                 continue
-            yield await self._get_universal_message(message)
+            yield self._get_universal_message(message)
 
-    async def send_message(self, message: UniversalMessage) -> Message:
+    async def send_message(
+        self, message: UniversalMessage
+    ) -> Optional[Message]:
         """Send a message to save on target.
 
         Args:
@@ -227,15 +128,29 @@ class Chat(Target):
         Returns:
             Message: Telegram Message Object
         """
-        if not message.file:
-            return await self.client.send_message(self.target, message.message)
-        else:
-            await message.file.download_media(self.client)
-            return await self.client.send_file(
-                self.target,
-                str(message.file.file_path),
-                caption=message.message,
+        if not message.message:
+            return
+
+        tg_message = message.message
+        save_path = (Path("chats") / str(self.target_id)) / str(tg_message.id)
+        save_path.mkdir(parents=True, exist_ok=True)
+        if tg_message.media:
+            custom_callback = create_callback(tg_message.media)
+            await self.client.download_media(
+                tg_message,
+                str(save_path),
+                progress_callback=custom_callback,
             )
+            file_path = next(p for p in save_path.iterdir() if p.is_file())
+            custom_callback = create_callback(tg_message.media, "Sending")
+            with open(file_path, "rb") as f:
+                return await self.client.send_file(
+                    self.target,
+                    f,
+                    caption=tg_message.message,
+                    progress_callback=custom_callback,
+                )
+        return await self.client.send_message(self.target, message.message)
 
 
 class DumpChat(Target):
@@ -255,11 +170,47 @@ class DumpChat(Target):
 
     def __create_initial_schema(self):
         self.__set_db_connection()
-        # TODO: Write a SQL script to create the schema
+        schema = """
+        create table if not exists messages (
+            id integer primary key,
+            chat_id integer,
+            message_id integer,
+            message_text text,
+            message_media_path text
+        );
 
-    def _get_universal_message(self, message: dict):
-        # TODO: Write the conversion (it depends of schema)
-        return UniversalMessage()
+        create table if not exists meta (
+            id integer primary key,
+            name text,
+            value text
+        );
+        """
+        self.__conn.executescript(schema)
+        self.__conn.commit()
+        self.chat_id = int(
+            self.__conn.execute(
+                "select value from meta where name = 'chat_id'"
+            ).fetchone()["value"]
+        )
+        if self.chat_id is None:
+            self.__cursor.execute(
+                "insert into meta (name, value) values ('chat_id', ?)",
+                (self.target_id,),
+            )
+            self.__conn.commit()
+            self.chat_id = int(getattr(self, "target_id"))
+
+    def _get_universal_message(self, message: dict | Message):
+        if isinstance(message, dict):
+            return UniversalMessage(self.client, self.chat_id, message["id"])
+        else:
+            return UniversalMessage(
+                self.client,
+                self.chat_id,
+                message.id,
+                retrieve=False,
+                message=message,
+            )
 
     async def iter_messages(self):
         loop = asyncio.get_running_loop()
@@ -270,13 +221,40 @@ class DumpChat(Target):
                 break
             yield self._get_universal_message(message)
 
+    def __download_media(self, message: Message) -> Optional[str]:
+        """Download the media of a message if exists and save it to a file
+
+        Args:
+            message (Message): The message to download
+
+        Returns:
+            str: The path of the downloaded file
+        """
+        if not message.media:
+            return
+        # TODO: implement
+        ...
+
     async def send_message(self, message: UniversalMessage):
-        return super().send_message(message)
+        tg_message = message.message
+        if not tg_message:
+            return
+        message_media_path = self.__download_media(tg_message)
+        self.__cursor.execute(
+            "insert into messages (chat_id, message_id, message_text, message_media_path) values (?, ?, ?, ?)",
+            (
+                self.chat_id,
+                tg_message.id,
+                tg_message.message,
+                message_media_path,
+            ),
+        )
+        self.__conn.commit()
 
 
 async def get_target(
     client: TelegramClient, target_id: Union[int, Path]
-) -> Union[DumpChat, Chat]:
+) -> Target:
     """Get a target object by ID
 
     Args:
@@ -289,4 +267,4 @@ async def get_target(
     if isinstance(target_id, Path):
         return DumpChat(client, target_id)
     else:
-        return await Chat.create(client, target_id)
+        return await TgChat.create(client, target_id)
