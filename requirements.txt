@@ -1,4 +1,5 @@
+cryptg==0.4.0
 pyaes==1.6.1
 pyasn1==0.5.1
 rsa==4.9
-Telethon==1.33.1
+telethon==1.33.1
