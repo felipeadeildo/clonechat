@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from tomllib import load
 from typing import Any
@@ -34,12 +35,11 @@ async def get_client(
     Returns:
         TelegramClient: Telegram Client Logged Session.
     """
+    logging.debug("Getting Telegram Client")
     settings = load_settings()
     telegram_settings = settings["telegram"]
 
-    client = TelegramClient(
-        str(session_path / session_name), **telegram_settings
-    )
+    client = TelegramClient(str(session_path / session_name), **telegram_settings)
 
     await client.connect()
 
@@ -50,5 +50,7 @@ async def get_client(
         await client.sign_in(phone, code)
 
     await client.start()  # type: ignore [call-start is awaitable]
+
+    logging.debug("Telegram Client Got")
 
     return client
