@@ -43,6 +43,14 @@ def get_args() -> argparse.Namespace:
         help="Output Chat ID like -100123456/@channelname or a foldername to dump the chat into dump.db file.",
         required=True,
     )
+    parser.add_argument(
+        "--loglevel",
+        metavar="LOGLEVEL",
+        type=str,
+        default="INFO",
+        help="Set the log level. Default: INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+    )
 
     args = parser.parse_args()
 
