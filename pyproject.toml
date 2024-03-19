@@ -11,6 +11,9 @@ telethon = "^1.33.1"
 cryptg = "^0.4.0"
 
 
+[tool.poetry.group.dev.dependencies]
+ipython = "^8.22.2"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

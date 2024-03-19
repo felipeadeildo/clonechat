@@ -18,7 +18,7 @@ def get_filename(media: Optional[TypeMessageMedia]) -> str:
     is_document = getattr(media, "document", None)
     if media and (content := is_document or is_photo):
         filename = next(
-            (attr.file_name for attr in content.attributes if getattr(attr, "file_name", None)),
+            (attr.file_name for attr in getattr(content, "attributes", []) if getattr(attr, "file_name", None)),
             None,
         )
     return filename or f"Unknown{'.jpg' if is_photo else ''}"

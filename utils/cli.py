@@ -52,6 +52,18 @@ def get_args() -> argparse.Namespace:
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
     )
 
+    parser.add_argument(
+        "--forward",
+        action="store_true",
+        help="Forward the messages from input to outptut if the user is allowed to do. Default: False",
+    )
+
+    parser.add_argument(
+        "--reverse",
+        action="store_true",
+        help="If set, the messages will be returned in reverse order (from oldest to newest, instead of the default newest to oldest). This also means that the meaning of `offset_id` and `offset_date` parameters is reversed, although they will still be exclusive. `min_id` becomes equivalent to `offset_id` instead of being `max_id` as well since messages are returned in ascending order. Default: False",
+    )
+
     args = parser.parse_args()
 
     return args

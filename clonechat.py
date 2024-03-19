@@ -20,6 +20,7 @@ class CloneChat:
         client: TelegramClient,
         input_id: Union[int, Path],
         output_id: Union[int, Path],
+        **extra_configs,
     ):
         """Initialize the controller
 
@@ -33,12 +34,17 @@ class CloneChat:
         self.client = client
         self.input_id = input_id
         self.output_id = output_id
+        self.extra_configs = extra_configs
 
     async def __get_targets(self):
         """Initialize Target and Output Chat"""
         logging.debug("Initializing Targets")
-        self.input = await get_target(self.client, self.input_id)
-        self.output = await get_target(self.client, self.output_id, represents_chat_id=self.input_id)
+        self.input = await get_target(self.client, self.input_id, **self.extra_configs)
+
+        self.extra_configs.update({"represents_chat_id": self.input_id})
+        self.output = await get_target(
+            self.client, self.output_id, **{**self.extra_configs, "db_path": self.input.db_path}
+        )
         logging.debug("Targets Initialized")
 
     async def clone(self):
@@ -69,7 +75,12 @@ async def main():
 
     client = await get_client()
 
-    await CloneChat(client, input_id, output_id).clone()
+    extra_configs = {
+        "forward_messages": args.forward,
+        "reverse_messages": args.reverse,
+    }
+
+    await CloneChat(client, input_id, output_id, **extra_configs).clone()
 
 
 if __name__ == "__main__":
