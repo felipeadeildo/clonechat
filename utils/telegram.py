@@ -17,19 +17,28 @@ class UniversalMessage:
     """Universal Message Representation"""
 
     def __init__(
-        self, client: TelegramClient, chat_id: int, message_id: int, retrieve: bool = True, **kw
+        self,
+        client: TelegramClient,
+        chat_id: int,
+        message_id: int,
+        retrieve: bool = True,
+        can_forward: bool = True,
+        **kw,
     ):
         self.client = client
         self.chat_id = chat_id
         self.message_id = message_id
         self.message: Message | None = None
+        self.can_forward = can_forward
         for k, v in kw.items():
             setattr(self, k, v)
         if retrieve:
             asyncio.run(self.retrieve_message())
 
     async def retrieve_message(self):
-        _message = await self.client.get_messages(self.chat_id, ids=self.message_id)
+        chat = await self.client.get_entity(self.chat_id)
+        self.can_forward = not getattr(chat, "noforwards", True)
+        _message = await self.client.get_messages(chat, ids=self.message_id)
         if _message:
             self.message = _message[0]
 
@@ -98,7 +107,7 @@ class TgChat(Target):
     def __init__(self, client: TelegramClient, chat_id: int, chat_entity: ..., **extra_configs):
         super().__init__(client, chat_id, **extra_configs)
         self.target = chat_entity
-        can_forward = getattr(self.target, "noforwards", False)
+        can_forward = not getattr(self.target, "noforwards", True)
         if self.forward_messages and not can_forward:
             logging.warning(f"Can't forward messages from {self.target_id}")
         self.forward_messages = self.forward_messages and can_forward
@@ -141,7 +150,9 @@ class TgChat(Target):
     def _get_universal_message(self, message: dict | Message):
         chat_id = int(getattr(self, "target_id"))
         if isinstance(message, dict):
-            return UniversalMessage(self.client, chat_id, message["id"])
+            return UniversalMessage(
+                self.client, chat_id, message["id"], can_forward=self.forward_messages
+            )
         else:
             return UniversalMessage(
                 self.client,
@@ -149,6 +160,7 @@ class TgChat(Target):
                 message.id,
                 retrieve=False,
                 message=message,
+                can_forward=self.forward_messages,
             )
 
     async def iter_messages(self):
@@ -197,12 +209,13 @@ class TgChat(Target):
 
         logging.debug(f"Sending message {tg_message.id} to {self.target_id}")
 
-        if self.forward_messages:
-            sent_messages = await self.client.forward_messages(
-                self.target, tg_message, as_album=True
-            )
-            for sent_message in sent_messages:
-                self.__insert_sent_message(message, sent_message)
+        if message.can_forward:
+            sent_messages = await self.client.forward_messages(self.target, tg_message)
+            if isinstance(sent_messages, Message):
+                self.__insert_sent_message(message, sent_messages)
+            else:
+                for sent_message in sent_messages:
+                    self.__insert_sent_message(message, sent_message)
             return
 
         save_path = (Path("chats") / str(self.target_id)) / str(tg_message.id)
