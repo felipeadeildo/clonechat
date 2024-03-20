@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import shutil
 from pathlib import Path
 from typing import Union
 
@@ -62,7 +63,6 @@ class CloneChat:
 
 async def main():
     args = get_args()
-    input_id, output_id = args.input, args.output
 
     logging.basicConfig(
         level=getattr(logging, args.loglevel.upper()),
@@ -73,14 +73,24 @@ async def main():
 
     logging.getLogger("telethon").setLevel(logging.CRITICAL)
 
-    client = await get_client()
+    if args.command == "clone":
+        client = await get_client()
 
-    extra_configs = {
-        "forward_messages": args.forward,
-        "reverse_messages": args.reverse,
-    }
+        extra_configs = {
+            "forward_messages": args.forward,
+            "reverse_messages": args.reverse,
+        }
 
-    await CloneChat(client, input_id, output_id, **extra_configs).clone()
+        input_id, output_id = args.input, args.output
+
+        await CloneChat(client, input_id, output_id, **extra_configs).clone()
+    elif args.command == "cleanup":
+        chats_path = Path("chats")
+        if chats_path.exists():
+            shutil.rmtree(chats_path)
+        logging.info(f"Removed {chats_path}. The directory is now empty.")
+    else:
+        logging.error(f"Invalid Command: {args.command}")
 
 
 if __name__ == "__main__":

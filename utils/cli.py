@@ -28,40 +28,53 @@ def get_args() -> argparse.Namespace:
         argparse.Namespace: Command line arguments.
     """
     parser = argparse.ArgumentParser(description="Telegram Clone Chat")
+    subparsers = parser.add_subparsers(dest="command", help="Commands")
 
-    parser.add_argument(
+    # Clone Chat Command
+    clone_parser = subparsers.add_parser("clone", help="Clone Chat")
+    clone_parser.add_argument(
         "--input",
+        "-i",
         metavar="INPUT",
         type=__argtype,
         help="Target Chat ID like -100123456/@channelname or a dumpped chat folder containing dump.db file.",
         required=True,
     )
-    parser.add_argument(
+    clone_parser.add_argument(
         "--output",
+        "-o",
         metavar="OUTPUT",
         type=__argtype,
         help="Output Chat ID like -100123456/@channelname or a foldername to dump the chat into dump.db file.",
         required=True,
     )
+
+    clone_parser.add_argument(
+        "--forward",
+        "-fwd",
+        action="store_true",
+        help="Forward the messages from input to outptut if the user is allowed to do. Default: False",
+    )
+
+    clone_parser.add_argument(
+        "--reverse",
+        "-rev",
+        action="store_true",
+        help="If set, the messages will be returned in reverse order (from oldest to newest, instead of the default newest to oldest). This also means that the meaning of `offset_id` and `offset_date` parameters is reversed, although they will still be exclusive. `min_id` becomes equivalent to `offset_id` instead of being `max_id` as well since messages are returned in ascending order. Default: False",
+    )
+
+    # CleanUP Command
+    subparsers.add_parser("cleanup", help="Cleanup Chats")
+
+    # General Arguments
     parser.add_argument(
         "--loglevel",
+        "-ll",
         metavar="LOGLEVEL",
         type=str,
         default="INFO",
         help="Set the log level. Default: INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-    )
-
-    parser.add_argument(
-        "--forward",
-        action="store_true",
-        help="Forward the messages from input to outptut if the user is allowed to do. Default: False",
-    )
-
-    parser.add_argument(
-        "--reverse",
-        action="store_true",
-        help="If set, the messages will be returned in reverse order (from oldest to newest, instead of the default newest to oldest). This also means that the meaning of `offset_id` and `offset_date` parameters is reversed, although they will still be exclusive. `min_id` becomes equivalent to `offset_id` instead of being `max_id` as well since messages are returned in ascending order. Default: False",
     )
 
     args = parser.parse_args()
