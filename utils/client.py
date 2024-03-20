@@ -4,6 +4,7 @@ from tomllib import load
 from typing import Any
 
 from telethon import TelegramClient
+from telethon.errors.rpcerrorlist import SessionPasswordNeededError
 
 SETTINGS_FILE = Path("settings.toml")
 
@@ -47,7 +48,13 @@ async def get_client(
         phone = input("Enter phone [+5577123456789]: ")
         await client.send_code_request(phone)
         code = input("Enter code: ")
-        await client.sign_in(phone, code)
+
+        try:
+            await client.sign_in(phone, code)
+        except SessionPasswordNeededError:
+            from getpass import getpass
+
+            await client.sign_in(password=getpass("Two-factor authentication code: "))
 
     await client.start()  # type: ignore [call-start is awaitable]
 
