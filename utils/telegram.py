@@ -6,9 +6,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import AsyncGenerator, Optional, Union
 
-from telethon import TelegramClient
-from telethon.tl.patched import MessageService
-from telethon.tl.types import Channel, Chat, Message, User
+from pyrogram.client import Client
+from pyrogram.types import Chat, ChatPreview, Message
 
 from utils.base import create_callback, get_filename
 
@@ -18,7 +17,7 @@ class UniversalMessage:
 
     def __init__(
         self,
-        client: TelegramClient,
+        client: Client,
         chat_id: int,
         message_id: int,
         retrieve: bool = True,
@@ -36,17 +35,21 @@ class UniversalMessage:
             asyncio.run(self.retrieve_message())
 
     async def retrieve_message(self):
-        chat = await self.client.get_entity(self.chat_id)
-        self.can_forward = not getattr(chat, "noforwards", True)
-        _message = await self.client.get_messages(chat, ids=self.message_id)
-        if _message:
+        chat = await self.client.get_chat(self.chat_id)
+        if isinstance(chat, ChatPreview):
+            raise ValueError("You must be a member of the chat to clone it")
+        self.can_forward = not chat.has_protected_content
+        _message = await self.client.get_messages(chat.id, message_ids=self.message_id)
+        if isinstance(_message, Message):
+            self.message = _message
+        else:
             self.message = _message[0]
 
 
 class Target(ABC):
     """Wrapper class for Target that implements some common methods for all targets."""
 
-    def __init__(self, client: TelegramClient, target_id: Union[int, Path], **extra_configs):
+    def __init__(self, client: Client, target_id: Union[int, Path], **extra_configs):
         self.client = client
         self.target_id = target_id
         self.target_path = Path("chats") / str(target_id)
@@ -104,10 +107,10 @@ class Target(ABC):
 
 class TgChat(Target):
 
-    def __init__(self, client: TelegramClient, chat_id: int, chat_entity: ..., **extra_configs):
+    def __init__(self, client: Client, chat_id: int, chat_entity: Chat, **extra_configs):
         super().__init__(client, chat_id, **extra_configs)
         self.target = chat_entity
-        can_forward = not getattr(self.target, "noforwards", True)
+        can_forward = not chat_entity.has_protected_content
         if self.forward_messages and not can_forward:
             logging.warning(f"Can't forward messages from {self.target_id}")
         self.forward_messages = self.forward_messages and can_forward
@@ -128,23 +131,23 @@ class TgChat(Target):
         self._conn.commit()
 
     @classmethod
-    async def create(cls, client: TelegramClient, chat_id: int, **extra_configs):
+    async def create(cls, client: Client, chat_id: int, **extra_configs):
         """Create a new Chat Instance
 
         Args:
-            client (TelegramClient): The client to use for the API call.
+            client (Client): The client to use for the API call.
             chat_id (int): The ID of the chat to clone.
             extra_configs (dict, optional): Extra configurations setted by the user.
 
         Returns:
-            Channel|Chat|User: The clonable chat entity.
+            TgChat: A new TgChat instance.
 
         Raises:
-            ValueError: If the entity is not a clonable chat.
+            ValueError: If the user is not a member of the chat.
         """
-        chat_entity = await client.get_entity(chat_id)
-        if not isinstance(chat_entity, (Channel, Chat, User)):
-            raise ValueError(f"Entity {type(chat_entity)} is not clonable")
+        chat_entity = await client.get_chat(chat_id)
+        if isinstance(chat_entity, ChatPreview):
+            raise ValueError("You must be a member of the chat to clone it")
         return cls(client, chat_id, chat_entity, **extra_configs)
 
     def _get_universal_message(self, message: dict | Message):
@@ -175,11 +178,12 @@ class TgChat(Target):
             else 0
         )
 
-        async for message in self.client.iter_messages(
-            self.target, reverse=self.reverse_messages, min_id=last_sent_message_id
-        ):
-            if isinstance(message, MessageService):
-                continue
+        # TODO: Apply reverse function here if needed by self.reverse_messages
+        messages_generator = self.client.get_chat_history(
+            self.target.id, offset_id=last_sent_message_id
+        )
+
+        async for message in messages_generator:  # type: ignore [is iterable]
             yield self._get_universal_message(message)
 
     def __insert_sent_message(self, original_message: UniversalMessage, sent_message: Message):
@@ -210,12 +214,14 @@ class TgChat(Target):
         logging.debug(f"Sending message {tg_message.id} to {self.target_id}")
 
         if message.can_forward:
-            sent_messages = await self.client.forward_messages(self.target, tg_message)
+            sent_messages = await self.client.copy_message(
+                self.target.id, message.chat_id, tg_message.id
+            )
             if isinstance(sent_messages, Message):
                 self.__insert_sent_message(message, sent_messages)
-            else:
-                for sent_message in sent_messages:
-                    self.__insert_sent_message(message, sent_message)
+            # else:
+            #     for sent_message in sent_messages:
+            #         self.__insert_sent_message(message, sent_message)
             return
 
         save_path = (Path("chats") / str(self.target_id)) / str(tg_message.id)
@@ -224,38 +230,47 @@ class TgChat(Target):
         logging.debug(f"Save Path to save media of message {tg_message.id} is: {save_path}")
 
         if tg_message.media:
-            logging.debug(f"Downloading media {tg_message.media}")
-            custom_callback = create_callback(tg_message.media)
+            media_type = tg_message.media.value
+            media = getattr(tg_message, str(media_type))
+
+            logging.debug(f"Downloading media {media}")
+
+            custom_callback = create_callback(media)
             await self.client.download_media(
                 tg_message,
-                str(save_path),
-                progress_callback=custom_callback,
+                str(save_path) + "/",
+                progress=custom_callback,
             )
             file_path = next(p for p in save_path.iterdir() if p.is_file())
-            custom_callback = create_callback(tg_message.media, "Sending")
+            custom_callback = create_callback(media, "Sending")
             with file_path.open("rb") as f:
-                logging.debug(f"Sending message with media {tg_message.media}")
-                sent_message = await self.client.send_file(
-                    self.target,
+
+                logging.debug(f"Sending message with media {media}")
+
+                send_function = getattr(self.client, f"send_{media_type}")
+
+                sent_message = await send_function(
+                    self.target.id,
                     f,
-                    caption=tg_message.message,
-                    progress_callback=custom_callback,
+                    caption=tg_message.text,
+                    progress=custom_callback,
                 )
             for file_path in save_path.iterdir():
                 os.remove(file_path)
             save_path.rmdir()
         else:
             logging.debug(f"Sending {tg_message.id} from {message.chat_id} message without media")
-            sent_message = await self.client.send_message(self.target, tg_message)
+            sent_message = await self.client.send_message(self.target.id, tg_message.text)
 
-        self.__insert_sent_message(message, sent_message)
+        if sent_message:
+            self.__insert_sent_message(message, sent_message)
 
 
 class DumpChat(Target):
 
     def __init__(
         self,
-        client: TelegramClient,
+        client: Client,
         path: Path,
         represents_chat_id: Optional[int] = None,
         **extra_configs,
@@ -347,7 +362,7 @@ class DumpChat(Target):
         await self.client.download_media(
             message,
             str(save_path),
-            progress_callback=custom_callback,
+            progress=custom_callback,
         )
 
         save_path = next(p for p in save_path.iterdir() if p.is_file())
@@ -363,18 +378,18 @@ class DumpChat(Target):
             (
                 self.chat_id,
                 tg_message.id,
-                tg_message.message,
+                tg_message.text,
                 message_media_path,
             ),
         )
         self._conn.commit()
 
 
-async def get_target(client: TelegramClient, target_id: Union[int, Path], **kw) -> Target:
+async def get_target(client: Client, target_id: Union[int, Path], **kw) -> Target:
     """Get a target object by ID
 
     Args:
-        client (TelegramClient): The client to use for the API call.
+        client (Client): The client to use for the API call.
         target_id (Union[int, Path]): The ID of the target chat.
         **kw: Additional keyword arguments.
 
