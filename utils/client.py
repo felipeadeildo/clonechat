@@ -39,7 +39,7 @@ async def get_client(session_name: str = "tg_session", session_path: Path = Path
 
     client = Client(str(session_path / session_name), **telegram_settings)
 
-    await client.start()
+    # await client.start()
 
     logging.debug("Telegram Client Got")
 

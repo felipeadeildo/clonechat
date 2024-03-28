@@ -4,14 +4,16 @@ import shutil
 from pathlib import Path
 from typing import Union
 
+from utils.cli import get_args
+from utils.client import get_client
+from utils.telegram.targets import get_target
+
 try:
     import uvloop
 except:
     uvloop = None
 
 from pyrogram.client import Client
-
-from utils import get_args, get_client, get_target
 
 
 class CloneChat:
@@ -55,13 +57,13 @@ class CloneChat:
 
     async def clone(self):
         """Start the clonation process"""
-        logging.info(f"Cloning from {self.input_id} to {self.output_id}")
         await self.__get_targets()
+        logging.info(f"Cloning from {self.input.friendly_name} to {self.output.friendly_name}")
         await self.__clone_messages()
 
     async def __clone_messages(self):
         """Iterate over messages and call the wrapper clonator method."""
-        logging.debug(f"Walking over messages of {self.input_id}")
+        logging.debug(f"Walking over messages of {self.input.friendly_name}")
         async for message in self.input.iter_messages():  # type: ignore
             await self.output.send_message(message)
 
@@ -88,7 +90,9 @@ async def main():
 
         input_id, output_id = args.input, args.output
 
-        await CloneChat(client, input_id, output_id, **extra_configs).clone()
+        async with client:
+            await CloneChat(client, input_id, output_id, **extra_configs).clone()
+
     elif args.command == "cleanup":
         chats_path = Path("chats")
         if chats_path.exists():

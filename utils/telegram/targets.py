@@ -1,108 +1,14 @@
 import asyncio
 import logging
 import os
-import sqlite3
-from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import AsyncGenerator, Optional, Union
+from typing import Optional, Union
 
 from pyrogram.client import Client
 from pyrogram.types import Chat, ChatPreview, Message
 
-from utils.base import create_callback, get_filename
-
-
-class UniversalMessage:
-    """Universal Message Representation"""
-
-    def __init__(
-        self,
-        client: Client,
-        chat_id: int,
-        message_id: int,
-        retrieve: bool = True,
-        can_forward: bool = True,
-        **kw,
-    ):
-        self.client = client
-        self.chat_id = chat_id
-        self.message_id = message_id
-        self.message: Message | None = None
-        self.can_forward = can_forward
-        for k, v in kw.items():
-            setattr(self, k, v)
-        if retrieve:
-            asyncio.run(self.retrieve_message())
-
-    async def retrieve_message(self):
-        chat = await self.client.get_chat(self.chat_id)
-        if isinstance(chat, ChatPreview):
-            raise ValueError("You must be a member of the chat to clone it")
-        self.can_forward = not chat.has_protected_content
-        _message = await self.client.get_messages(chat.id, message_ids=self.message_id)
-        if isinstance(_message, Message):
-            self.message = _message
-        else:
-            self.message = _message[0]
-
-
-class Target(ABC):
-    """Wrapper class for Target that implements some common methods for all targets."""
-
-    def __init__(self, client: Client, target_id: Union[int, Path], **extra_configs):
-        self.client = client
-        self.target_id = target_id
-        self.target_path = Path("chats") / str(target_id)
-        self.forward_messages = extra_configs.get("forward_messages", False)
-        self.reverse_messages = extra_configs.get("reverse_messages", False)
-        self.db_path = (
-            self.target_path / "dump.db"
-            if not extra_configs.get("db_path")
-            else extra_configs["db_path"]
-        )
-        self.__init_db()
-
-    @abstractmethod
-    async def iter_messages(self) -> AsyncGenerator[UniversalMessage, None]:
-        """Async generator of messages [UniversalMessage]"""
-        raise NotImplemented
-
-    @abstractmethod
-    async def send_message(self, message: UniversalMessage):
-        """Send a message to save on target.
-
-        Args:
-            message (UniversalMessage): The message to send.
-        """
-        raise NotImplemented
-
-    @abstractmethod
-    def _get_universal_message(self, message: Union[dict, Message]):
-        """Convert a message to [UniversalMessage]
-
-        Args:
-            message (Union[dict, Message]): The message to convert.
-                Is a dict if from `DumpChat`, else from `Chat`.
-        """
-        raise NotImplemented
-
-    def __init_db(self):
-        """Initialize the database connection
-
-        Args:
-            db_path (Path): The path of the database
-        """
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(self.db_path)
-        self._conn.row_factory = sqlite3.Row
-
-        self._cursor = self._conn.cursor()
-        self._create_initial_schema()
-
-    @abstractmethod
-    def _create_initial_schema(self):
-        """Define an create the schema from the target messages controller db (if not exists)"""
-        raise NotImplemented
+from .abstract import Target
+from .message import UniversalMessage
 
 
 class TgChat(Target):
@@ -110,9 +16,10 @@ class TgChat(Target):
     def __init__(self, client: Client, chat_id: int, chat_entity: Chat, **extra_configs):
         super().__init__(client, chat_id, **extra_configs)
         self.target = chat_entity
+        self.friendly_name = self.get_friendly_chat_name(self, client)
         can_forward = not chat_entity.has_protected_content
         if self.forward_messages and not can_forward:
-            logging.warning(f"Can't forward messages from {self.target_id}")
+            logging.warning(f"Can't forward messages from {self.friendly_name}")
         self.forward_messages = self.forward_messages and can_forward
 
     def _create_initial_schema(self):
@@ -213,7 +120,7 @@ class TgChat(Target):
         if not tg_message:
             return
 
-        logging.debug(f"Sending message {tg_message.id} to {self.target_id}")
+        logging.info(f"Sending message {self.get_message_url(tg_message)} to {self.friendly_name}")
 
         if message.can_forward:
             sent_messages = await self.client.copy_message(
@@ -229,22 +136,26 @@ class TgChat(Target):
         save_path = (Path("chats") / str(self.target_id)) / str(tg_message.id)
         save_path.mkdir(parents=True, exist_ok=True)
 
-        logging.debug(f"Save Path to save media of message {tg_message.id} is: {save_path}")
+        logging.info(
+            f"Save Path to save media of message {self.get_message_url(tg_message)} is: {save_path}"
+        )
 
         if tg_message.media:
             media_type = tg_message.media.value
             media = getattr(tg_message, str(media_type))
 
-            logging.debug(f"Downloading media {media}")
+            logging.info(
+                f"Downloading media {self.get_filename(media)} from {self.get_message_url(tg_message)}"
+            )
 
-            custom_callback = create_callback(media)
+            custom_callback = self.create_callback(media)
             await self.client.download_media(
                 tg_message,
                 str(save_path) + "/",
                 progress=custom_callback,
             )
             file_path = next(p for p in save_path.iterdir() if p.is_file())
-            custom_callback = create_callback(media, "Sending")
+            custom_callback = self.create_callback(media, "Sending")
             with file_path.open("rb") as f:
 
                 logging.debug(f"Sending message with media {media}")
@@ -261,7 +172,7 @@ class TgChat(Target):
                 os.remove(file_path)
             save_path.rmdir()
         else:
-            logging.debug(f"Sending {tg_message.id} from {message.chat_id} message without media")
+            logging.info(f"Sending {self.get_message_url(tg_message)} message without media")
             sent_message = await self.client.send_message(self.target.id, tg_message.text)
 
         if sent_message:
@@ -279,6 +190,7 @@ class DumpChat(Target):
     ):
         super().__init__(client, path, **extra_configs)
         self.__get_chat_id(represents_chat_id)
+        self.friendly_name = self.get_friendly_chat_name(self, client)
 
     def __get_chat_id(self, represents_chat_id: Optional[int]):
         if represents_chat_id:
@@ -352,14 +264,16 @@ class DumpChat(Target):
         save_path = self.target_path / str(message.id)
         save_path.mkdir(parents=True, exist_ok=True)
 
-        save_path /= get_filename(message.media)
+        save_path /= self.get_filename(message.media)
 
         if save_path.exists():
             return str(save_path)
 
-        logging.debug(f"Save Path to save media of message {message.id} is: {save_path}")
+        logging.debug(
+            f"Save Path to save media of message {self.get_message_url(message)} is: {save_path}"
+        )
 
-        custom_callback = create_callback(message.media, "Downloading")
+        custom_callback = self.create_callback(message.media, "Downloading")
 
         await self.client.download_media(
             message,
