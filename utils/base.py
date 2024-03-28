@@ -1,10 +1,10 @@
 import logging
 from typing import Callable, Literal, Optional
 
-from telethon.types import TypeMessageMedia
+from pyrogram.enums import MessageMediaType
 
 
-def get_filename(media: Optional[TypeMessageMedia]) -> str:
+def get_filename(media: Optional[MessageMediaType]) -> str:
     """Get the filename of the media
 
     Args:
@@ -13,19 +13,13 @@ def get_filename(media: Optional[TypeMessageMedia]) -> str:
     Returns:
         str: The filename
     """
-    filename = None
-    is_photo = getattr(media, "photo", None)
-    is_document = getattr(media, "document", None)
-    if media and (content := is_document or is_photo):
-        filename = next(
-            (attr.file_name for attr in getattr(content, "attributes", []) if getattr(attr, "file_name", None)),
-            None,
-        )
-    return filename or f"Unknown{'.jpg' if is_photo else ''}"
+    filename = getattr(media, "file_name", None)
+    media_type = getattr(media, "media_type", "jpg").split("/")[0]
+    return filename or f"Unknown.{media_type}"
 
 
 def create_callback(
-    media: Optional[TypeMessageMedia],
+    media: Optional[MessageMediaType],
     action: Literal["Downloading", "Sending"] = "Downloading",
 ) -> Callable[[int, int], None]:
     """Create a Personalized callback for media download progress

@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 from typing import Union
 
-from telethon import TelegramClient
+from pyrogram.client import Client
 
 from utils import get_args, get_client, get_target
 
@@ -18,7 +18,7 @@ class CloneChat:
 
     def __init__(
         self,
-        client: TelegramClient,
+        client: Client,
         input_id: Union[int, Path],
         output_id: Union[int, Path],
         **extra_configs,
@@ -71,7 +71,7 @@ async def main():
         handlers=[logging.StreamHandler()],
     )
 
-    logging.getLogger("telethon").setLevel(logging.CRITICAL)
+    logging.getLogger("pyrogram").setLevel(logging.CRITICAL)
 
     if args.command == "clone":
         client = await get_client()
