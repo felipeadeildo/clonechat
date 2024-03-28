@@ -1,0 +1,5 @@
+cryptg==0.4.0
+pyaes==1.6.1
+pyrogram==2.0.106
+pysocks==1.7.1
+tgcrypto==1.2.5

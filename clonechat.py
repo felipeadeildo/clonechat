@@ -4,7 +4,11 @@ import shutil
 from pathlib import Path
 from typing import Union
 
-import uvloop
+try:
+    import uvloop
+except:
+    uvloop = None
+
 from pyrogram.client import Client
 
 from utils import get_args, get_client, get_target
@@ -95,5 +99,6 @@ async def main():
 
 
 if __name__ == "__main__":
-    uvloop.install()
+    if uvloop is not None:
+        uvloop.install()
     asyncio.run(main())
