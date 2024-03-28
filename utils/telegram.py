@@ -184,6 +184,8 @@ class TgChat(Target):
         )
 
         async for message in messages_generator:  # type: ignore [is iterable]
+            if getattr(message, "service"):
+                continue
             yield self._get_universal_message(message)
 
     def __insert_sent_message(self, original_message: UniversalMessage, sent_message: Message):
