@@ -250,13 +250,13 @@ class TgChat(Target):
                 logging.debug(f"Sending message with media {media}")
 
                 send_function = getattr(self.client, f"send_{media_type}")
+                args = [self.target.id, f]
+                kwargs = {"caption": tg_message.text, "progress": custom_callback}
+                if media_type not in ("photo", "audio", "sticker"):
+                    kwargs["file_name"] = file_path.name
 
-                sent_message = await send_function(
-                    self.target.id,
-                    f,
-                    caption=tg_message.text,
-                    progress=custom_callback,
-                )
+                sent_message = await send_function(*args, **kwargs)
+
             for file_path in save_path.iterdir():
                 os.remove(file_path)
             save_path.rmdir()
