@@ -87,4 +87,4 @@ def get_friendly_chat_name(target: Target | Chat, client: Optional[Client] = Non
 
 
 def get_message_url(message: Message) -> str:
-    return f"https://t.me/c/{message.chat.id}/{message.id}"
+    return f"https://t.me/c/{str(message.chat.id).removeprefix('-100')}/{message.id}"
