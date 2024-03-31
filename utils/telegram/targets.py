@@ -135,6 +135,8 @@ class TgChat(Target):
 
         save_path = (Path("chats") / str(self.target_id)) / str(tg_message.id)
         save_path.mkdir(parents=True, exist_ok=True)
+        for file_path in save_path.iterdir():
+            os.remove(file_path)
 
         logging.info(
             f"Save Path to save media of message {self.get_message_url(tg_message)} is: {save_path}"
