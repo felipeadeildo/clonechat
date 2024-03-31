@@ -149,12 +149,14 @@ class TgChat(Target):
             )
 
             custom_callback = self.create_callback(media)
-            await self.client.download_media(
+            file_path = await self.client.download_media(
                 tg_message,
                 str(save_path) + "/",
                 progress=custom_callback,
             )
-            file_path = next(p for p in save_path.iterdir() if p.is_file())
+            if not isinstance(file_path, str):
+                return logging.error("An error ocurred when trying to download the file. Skipping.")
+            file_path = Path(file_path)
             custom_callback = self.create_callback(media, "Sending")
             with file_path.open("rb") as f:
 
@@ -166,8 +168,13 @@ class TgChat(Target):
                 if media_type not in ("photo", "audio", "sticker"):
                     kwargs["file_name"] = file_path.name
 
-                sent_message = await send_function(*args, **kwargs)
-
+                try:
+                    sent_message = await send_function(*args, **kwargs)
+                except ValueError:
+                    logging.warning(
+                        "An error ocurred when trying to send the file, trying to send again..."
+                    )
+                    return await self.send_message(message)
             for file_path in save_path.iterdir():
                 os.remove(file_path)
             save_path.rmdir()
