@@ -16,7 +16,7 @@ class TgChat(Target):
     def __init__(self, client: Client, chat_id: int, chat_entity: Chat, **extra_configs):
         super().__init__(client, chat_id, **extra_configs)
         self.target = chat_entity
-        self.friendly_name = self.get_friendly_chat_name(self, client)
+        self.friendly_name = self.get_friendly_chat_name(self)
         can_forward = not chat_entity.has_protected_content
         if self.forward_messages and not can_forward:
             logging.warning(f"Can't forward messages from {self.friendly_name}")
@@ -38,7 +38,9 @@ class TgChat(Target):
         self._conn.commit()
 
     @classmethod
-    async def create(cls, client: Client, chat_id: int, **extra_configs):
+    async def create(
+        cls, client: Client, *, chat_id: Optional[int], chat: Optional[Chat], **extra_configs
+    ):
         """Create a new Chat Instance
 
         Args:
@@ -52,9 +54,15 @@ class TgChat(Target):
         Raises:
             ValueError: If the user is not a member of the chat.
         """
-        chat_entity = await client.get_chat(chat_id)
-        if isinstance(chat_entity, ChatPreview):
-            raise ValueError("You must be a member of the chat to clone it")
+        if chat_id:
+            chat_entity = await client.get_chat(chat_id)
+            if isinstance(chat_entity, ChatPreview):
+                raise ValueError("You must be a member of the chat to clone it")
+        elif chat:
+            chat_entity = chat
+            chat_id = chat_entity.id
+        else:
+            raise ValueError("No chat_id or chat provided")
         return cls(client, chat_id, chat_entity, **extra_configs)
 
     def _get_universal_message(self, message: dict | Message):
@@ -188,142 +196,18 @@ class TgChat(Target):
             self.__insert_sent_message(message, sent_message)
 
 
-class DumpChat(Target):
-
-    def __init__(
-        self,
-        client: Client,
-        path: Path,
-        represents_chat_id: Optional[int] = None,
-        **extra_configs,
-    ):
-        super().__init__(client, path, **extra_configs)
-        self.__get_chat_id(represents_chat_id)
-        self.friendly_name = self.get_friendly_chat_name(self, client)
-
-    def __get_chat_id(self, represents_chat_id: Optional[int]):
-        if represents_chat_id:
-            self.chat_id = represents_chat_id
-        else:
-            chat_id = self._conn.execute("select value from meta where name = 'chat_id'").fetchone()
-            if chat_id:
-                self.chat_id = chat_id[0]
-            else:
-                self.chat_id = 0
-        logging.debug(f"Chat ID: {self.chat_id}")
-        self._conn.execute(
-            "insert or replace into meta (name, value) values ('chat_id', ?)", (self.chat_id,)
-        )
-        self._conn.commit()
-
-    def _create_initial_schema(self):
-        logging.debug("Creating Initial Schema")
-        schema = """
-        create table if not exists messages (
-            id integer primary key,
-            chat_id integer,
-            message_id integer,
-            message_text text,
-            message_media_path text,
-            added_at datetime default current_timestamp
-        );
-
-        create table if not exists meta (
-            id integer primary key,
-            name text,
-            value text
-        );
-        """
-        self._cursor.executescript(schema)
-        self._conn.commit()
-        logging.debug("Initial Schema Created")
-
-    def _get_universal_message(self, message: dict | Message):
-        if isinstance(message, dict):
-            return UniversalMessage(self.client, self.chat_id, message["message_id"])
-        else:
-            return UniversalMessage(
-                self.client,
-                self.chat_id,
-                message.id,
-                retrieve=False,
-                message=message,
-            )
-
-    async def iter_messages(self):
-        loop = asyncio.get_running_loop()
-        self._cursor.execute("SELECT * FROM messages")
-        while True:
-            message = await loop.run_in_executor(None, self._cursor.fetchone)
-            if message is None:
-                break
-            yield self._get_universal_message(message)
-
-    async def __download_media(self, message: Message) -> Optional[str]:
-        """Download the media of a message if exists and save it to a file
-
-        Args:
-            message (Message): The message to download
-
-        Returns:
-            str: The path of the downloaded file
-        """
-        if not message.media:
-            return
-        save_path = self.target_path / str(message.id)
-        save_path.mkdir(parents=True, exist_ok=True)
-
-        save_path /= self.get_filename(message.media)
-
-        if save_path.exists():
-            return str(save_path)
-
-        logging.debug(
-            f"Save Path to save media of message {self.get_message_url(message)} is: {save_path}"
-        )
-
-        custom_callback = self.create_callback(message.media, "Downloading")
-
-        await self.client.download_media(
-            message,
-            str(save_path),
-            progress=custom_callback,
-        )
-
-        save_path = next(p for p in save_path.iterdir() if p.is_file())
-        return str(save_path)
-
-    async def send_message(self, message: UniversalMessage):
-        tg_message = message.message
-        if not tg_message:
-            return
-        message_media_path = await self.__download_media(tg_message)
-        self._cursor.execute(
-            "insert into messages (chat_id, message_id, message_text, message_media_path) values (?, ?, ?, ?)",
-            (
-                self.chat_id,
-                tg_message.id,
-                tg_message.text,
-                message_media_path,
-            ),
-        )
-        self._conn.commit()
-
-
-async def get_target(client: Client, target_id: Union[int, Path], **kw) -> Target:
+async def get_target(
+    client: Client, *, chat_id: Optional[int] = None, chat: Optional[Chat] = None, **kw
+) -> Target:
     """Get a target object by ID
 
     Args:
         client (Client): The client to use for the API call.
-        target_id (Union[int, Path]): The ID of the target chat.
+        target_id (int): The ID of the target chat.
         **kw: Additional keyword arguments.
 
     Returns:
         Target: The target wrapper object.
     """
-    if isinstance(target_id, Path):
-        logging.debug(f"Target {target_id} is a local dump")
-        return DumpChat(client, target_id, **kw)
-    else:
-        logging.debug(f"Target {target_id} is a remote telegram chat")
-        return await TgChat.create(client, target_id, **kw)
+    logging.debug(f"Target {chat_id} is a remote telegram chat")
+    return await TgChat.create(client, chat_id=chat_id, chat=chat, **kw)

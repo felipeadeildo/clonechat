@@ -1,13 +1,11 @@
-import asyncio
 import logging
 from typing import Callable, Literal, Optional
 
-from pyrogram.client import Client
 from pyrogram.enums import MessageMediaType
-from pyrogram.types import Chat, Message
+from pyrogram.types import Chat, Dialog, Message
 
 from .telegram.abstract import Target
-from .telegram.targets import DumpChat, TgChat
+from .telegram.targets import TgChat
 
 
 def get_filename(media: Optional[MessageMediaType]) -> str:
@@ -49,7 +47,7 @@ def create_callback(
     return callback
 
 
-def get_friendly_chat_name(target: Target | Chat, client: Optional[Client] = None) -> str:
+def get_friendly_chat_name(target: Target | Chat | Dialog) -> str:
     """Get the friendly name of the chat
 
     Args:
@@ -61,13 +59,10 @@ def get_friendly_chat_name(target: Target | Chat, client: Optional[Client] = Non
     name = ""
     if isinstance(target, TgChat):
         chat = target.target
-    elif isinstance(target, DumpChat):
-        if client:
-            chat = asyncio.run(client.get_chat(chat_id=target.chat_id))
-        else:
-            return f"Chat {target.target_id}"
     elif isinstance(target, Chat):
         chat = target
+    elif isinstance(target, Dialog):
+        chat = target.chat
     else:
         return f"Chat {target}"
 
@@ -88,3 +83,7 @@ def get_friendly_chat_name(target: Target | Chat, client: Optional[Client] = Non
 
 def get_message_url(message: Message) -> str:
     return f"https://t.me/c/{str(message.chat.id).removeprefix('-100')}/{message.id}"
+
+
+def is_yes_answer(answer: str) -> bool:
+    return answer.lower() in ["s", "sim", "y", "yes"]

@@ -1,9 +1,8 @@
 import argparse
-from pathlib import Path
 from typing import Union
 
 
-def __argtype(value: str) -> Union[int, Path]:
+def __argtype(value: str) -> Union[int, str]:
     """Parse the command line arguments
 
     Args:
@@ -11,14 +10,12 @@ def __argtype(value: str) -> Union[int, Path]:
 
     Returns:
         int: If the value can be converted to int, returns the value.
-            This int can be a `chat_id`.
-        Path: If the value can be converted to Path, returns the value.
-            This Path can be a `foldername` of a dumpped chat.
+            This int can be a `chat_id`
     """
     try:
         return int(value)
-    except:
-        return Path(value)
+    except ValueError:
+        return value
 
 
 def get_args() -> argparse.Namespace:
@@ -37,7 +34,7 @@ def get_args() -> argparse.Namespace:
         "-i",
         metavar="INPUT",
         type=__argtype,
-        help="Target Chat ID like -100123456/@channelname or a dumpped chat folder containing dump.db file.",
+        help="Target Chat ID like -100123456/@channelname",
         required=True,
     )
     clone_parser.add_argument(
@@ -45,7 +42,7 @@ def get_args() -> argparse.Namespace:
         "-o",
         metavar="OUTPUT",
         type=__argtype,
-        help="Output Chat ID like -100123456/@channelname or a foldername to dump the chat into dump.db file.",
+        help="Output Chat ID like -100123456/@channelname",
         required=True,
     )
 
@@ -60,7 +57,7 @@ def get_args() -> argparse.Namespace:
         "--reverse",
         "-rev",
         action="store_true",
-        help="If set, the messages will be returned in reverse order (from oldest to newest, instead of the default newest to oldest). This also means that the meaning of `offset_id` and `offset_date` parameters is reversed, although they will still be exclusive. `min_id` becomes equivalent to `offset_id` instead of being `max_id` as well since messages are returned in ascending order. Default: False",
+        help="Reverse the message order. Default: False",
     )
 
     # CleanUP Command
@@ -76,6 +73,7 @@ def get_args() -> argparse.Namespace:
         help="Set the log level. Default: INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
     )
+    parser.set_defaults(command="interactive")
 
     args = parser.parse_args()
 
