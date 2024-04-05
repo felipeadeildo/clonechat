@@ -141,7 +141,7 @@ class TgChat(Target):
             #         self.__insert_sent_message(message, sent_message)
             return
 
-        save_path = (Path("chats") / str(self.target_id)) / str(tg_message.id)
+        save_path = Path("chats") / str(self.target_id) / str(tg_message.id)
         save_path.mkdir(parents=True, exist_ok=True)
         for file_path in save_path.iterdir():
             os.remove(file_path)
@@ -168,23 +168,26 @@ class TgChat(Target):
                 return logging.error("An error ocurred when trying to download the file. Skipping.")
             file_path = Path(file_path)
             custom_callback = self.create_callback(media, "Sending")
-            with file_path.open("rb") as f:
+            file_buffer = file_path.open("rb")
 
-                logging.debug(f"Sending message with media {media}")
+            logging.debug(f"Sending message with media {media}")
 
-                send_function = getattr(self.client, f"send_{media_type}")
-                args = [self.target.id, f]
-                kwargs = {"caption": tg_message.text, "progress": custom_callback}
-                if media_type not in ("photo", "audio", "sticker"):
-                    kwargs["file_name"] = file_path.name
+            send_function = getattr(self.client, f"send_{media_type}")
+            args = [self.target.id, file_buffer]
+            kwargs = {"caption": tg_message.text, "progress": custom_callback}
+            if media_type not in ("photo", "audio", "sticker"):
+                kwargs["file_name"] = file_path.name
 
-                try:
-                    sent_message = await send_function(*args, **kwargs)
-                except ValueError:
-                    logging.warning(
-                        "An error ocurred when trying to send the file, trying to send again..."
-                    )
-                    return await self.send_message(message)
+            try:
+                sent_message = await send_function(*args, **kwargs)
+            except ValueError:
+                logging.warning(
+                    "An error ocurred when trying to send the file, trying to send again..."
+                )
+                file_buffer.close()
+                return await self.send_message(message)
+            else:
+                file_buffer.close()
             for file_path in save_path.iterdir():
                 os.remove(file_path)
             save_path.rmdir()
