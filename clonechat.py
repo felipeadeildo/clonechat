@@ -84,9 +84,16 @@ class InteractiveCloneChat:
     def __init__(self, client: Client):
         self.client = client
 
-    async def __get_target_chat(self, dialogs: List[Dialog]) -> Chat:
-        choice = input("Do you want set the chat_id manually? [y/N] ")
-        if is_yes_answer(choice):
+    async def __get_target_chat(
+        self, dialogs: List[Dialog], dialogs_loaded: bool = True
+    ) -> Chat:
+        if not dialogs_loaded:
+            choice = True
+        else:
+            choice = is_yes_answer(
+                input("Do you want set the chat_id manually? [y/n] ")
+            )
+        if choice:
             chat_id = int(input("Enter the chat_id: "))
             chat = await self.client.get_chat(chat_id)
             if not isinstance(chat, Chat):
@@ -101,17 +108,23 @@ class InteractiveCloneChat:
         return dialogs[choice - 1].chat
 
     async def __get_target_chats(self) -> tuple[Chat, Chat]:
+        want_load_dialogs = is_yes_answer(
+            input(
+                "Do you want to load dialogs to select from a list of dialogs (chats)? [y/n]"
+            )
+        )
         dialogs = []
-        print("Loading dialogs...", end=" ")
-        async for dialog in self.client.get_dialogs():  # type: ignore
-            dialogs.append(dialog)
-        print("Done!")
+        if want_load_dialogs:
+            print("Loading dialogs...", end=" ", flush=True)
+            async for dialog in self.client.get_dialogs():  # type: ignore
+                dialogs.append(dialog)
+            print("Done!")
 
         print("Select the chat you want to clone: ")
-        input_chat = await self.__get_target_chat(dialogs)
+        input_chat = await self.__get_target_chat(dialogs, want_load_dialogs)
 
         print("Select the chat you want to clone to: ")
-        output_chat = await self.__get_target_chat(dialogs)
+        output_chat = await self.__get_target_chat(dialogs, want_load_dialogs)
         return input_chat, output_chat
 
     # async def __get_topic(self, chat: Chat):
