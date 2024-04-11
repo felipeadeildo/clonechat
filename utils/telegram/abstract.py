@@ -1,4 +1,4 @@
-import asyncio
+# import asyncio
 import sqlite3
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -42,7 +42,7 @@ class Target(ABC):
     @abstractmethod
     async def iter_messages(self) -> AsyncGenerator[UniversalMessage, None]:
         """Async generator of messages [UniversalMessage]"""
-        raise NotImplemented
+        raise NotImplementedError
 
     @abstractmethod
     async def send_message(self, message: UniversalMessage):
@@ -51,7 +51,7 @@ class Target(ABC):
         Args:
             message (UniversalMessage): The message to send.
         """
-        raise NotImplemented
+        raise NotImplementedError
 
     @abstractmethod
     def _get_universal_message(self, message: Union[dict, Message]):
@@ -61,7 +61,7 @@ class Target(ABC):
             message (Union[dict, Message]): The message to convert.
                 Is a dict if from `DumpChat`, else from `Chat`.
         """
-        raise NotImplemented
+        raise NotImplementedError
 
     def __init_db(self):
         """Initialize the database connection
@@ -79,4 +79,4 @@ class Target(ABC):
     @abstractmethod
     def _create_initial_schema(self):
         """Define an create the schema from the target messages controller db (if not exists)"""
-        raise NotImplemented
+        raise NotImplementedError

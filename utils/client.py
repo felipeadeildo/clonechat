@@ -1,9 +1,9 @@
 import logging
 from pathlib import Path
-from tomllib import load
 from typing import Any
 
 from pyrogram.client import Client
+from tomllib import load
 
 SETTINGS_FILE = Path("settings.toml")
 
@@ -23,7 +23,9 @@ def load_settings() -> dict[str, Any]:
         return load(f)
 
 
-async def get_client(session_name: str = "tg_session", session_path: Path = Path(".")) -> Client:
+async def get_client(
+    session_name: str = "tg_session", session_path: Path = Path(".")
+) -> Client:
     """Get the logged Telegram Client
 
     Args:

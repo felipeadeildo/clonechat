@@ -34,10 +34,13 @@ def create_callback(
     Returns:
         Callable[[int, int], None]: The callback
     """
-    in_mb = lambda bytes: bytes / 1024 / 1024
+
+    def in_mb(bytes: int) -> float:
+        return bytes / 1024 / 1024
+
     filename = get_filename(media)
 
-    def callback(download_bytes, total: Optional[int]):
+    def callback(download_bytes, total: int = 0):
         percent = download_bytes / total * 100
         finished = download_bytes == total
         text = f"{action} {filename}: ({percent:.2f}%) {in_mb(download_bytes):.2f} MB / {in_mb(total):.2f} MB"

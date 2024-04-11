@@ -1,8 +1,8 @@
-import asyncio
+# import asyncio
 import logging
 import os
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 
 from pyrogram.client import Client
 from pyrogram.types import Chat, ChatPreview, Message
@@ -12,8 +12,9 @@ from .message import UniversalMessage
 
 
 class TgChat(Target):
-
-    def __init__(self, client: Client, chat_id: int, chat_entity: Chat, **extra_configs):
+    def __init__(
+        self, client: Client, chat_id: int, chat_entity: Chat, **extra_configs
+    ):
         super().__init__(client, chat_id, **extra_configs)
         self.target = chat_entity
         self.friendly_name = self.get_friendly_chat_name(self)
@@ -39,7 +40,12 @@ class TgChat(Target):
 
     @classmethod
     async def create(
-        cls, client: Client, *, chat_id: Optional[int], chat: Optional[Chat], **extra_configs
+        cls,
+        client: Client,
+        *,
+        chat_id: Optional[int],
+        chat: Optional[Chat],
+        **extra_configs,
     ):
         """Create a new Chat Instance
 
@@ -103,7 +109,9 @@ class TgChat(Target):
                 continue
             yield self._get_universal_message(message)
 
-    def __insert_sent_message(self, original_message: UniversalMessage, sent_message: Message):
+    def __insert_sent_message(
+        self, original_message: UniversalMessage, sent_message: Message
+    ):
         self._cursor.execute(
             "insert into messages (input_chat_id, input_message_id, output_chat_id, output_message_id) values (?, ?, ?, ?)",
             (
@@ -128,7 +136,9 @@ class TgChat(Target):
         if not tg_message:
             return
 
-        logging.info(f"Sending message {self.get_message_url(tg_message)} to {self.friendly_name}")
+        logging.info(
+            f"Sending message {self.get_message_url(tg_message)} to {self.friendly_name}"
+        )
 
         if message.can_forward:
             sent_messages = await self.client.copy_message(
@@ -165,7 +175,9 @@ class TgChat(Target):
                 progress=custom_callback,
             )
             if not isinstance(file_path, str):
-                return logging.error("An error ocurred when trying to download the file. Skipping.")
+                return logging.error(
+                    "An error ocurred when trying to download the file. Skipping."
+                )
             file_path = Path(file_path)
             custom_callback = self.create_callback(media, "Sending")
             file_buffer = file_path.open("rb")
@@ -192,8 +204,12 @@ class TgChat(Target):
                 os.remove(file_path)
             save_path.rmdir()
         else:
-            logging.info(f"Sending {self.get_message_url(tg_message)} message without media")
-            sent_message = await self.client.send_message(self.target.id, tg_message.text)
+            logging.info(
+                f"Sending {self.get_message_url(tg_message)} message without media"
+            )
+            sent_message = await self.client.send_message(
+                self.target.id, tg_message.text
+            )
 
         if sent_message:
             self.__insert_sent_message(message, sent_message)

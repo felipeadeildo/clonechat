@@ -16,7 +16,7 @@ from utils.telegram.targets import get_target
 
 try:
     import uvloop
-except:
+except:  # noqa: E722
     uvloop = None
 
 from pyrogram.client import Client
@@ -53,7 +53,9 @@ class CloneChat:
     async def __get_targets(self):
         """Initialize Target and Output Chat"""
         logging.debug("Initializing Targets")
-        self.input = await get_target(self.client, chat_id=self.input_id, **self.extra_configs)
+        self.input = await get_target(
+            self.client, chat_id=self.input_id, **self.extra_configs
+        )
 
         self.extra_configs.update({"represents_chat_id": self.input_id})
         self.output = await get_target(
@@ -66,7 +68,9 @@ class CloneChat:
     async def clone(self):
         """Start the clonation process"""
         await self.__get_targets()
-        logging.info(f"Cloning from {self.input.friendly_name} to {self.output.friendly_name}")
+        logging.info(
+            f"Cloning from {self.input.friendly_name} to {self.output.friendly_name}"
+        )
         await self.__clone_messages()
 
     async def __clone_messages(self):
@@ -126,12 +130,16 @@ class InteractiveCloneChat:
         config = {
             "forward_messages": is_yes_answer(input("Try to Forward messages? [y/N] ")),
             "reverse_messages": is_yes_answer(input("Try to Reverse messages? [y/N] ")),
-            "threads": int(input("How many simultaneous downloads do you want? [1-10] ")),
+            "threads": int(
+                input("How many simultaneous downloads do you want? [1-10] ")
+            ),
         }
 
         self.input = await get_target(self.client, chat=self.input_chat, **config)
         self.output = await get_target(
-            self.client, chat=self.output_chat, **{**config, "db_path": self.input.db_path}
+            self.client,
+            chat=self.output_chat,
+            **{**config, "db_path": self.input.db_path},
         )
 
         # if self.input.type == ChatType.SUPERGROUP:
