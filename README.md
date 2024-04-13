@@ -26,14 +26,17 @@ python3 clonechat.py clone --input/-i <output_folder_name> --output/-o <chat_id>
 python3 clonechat.py clone --input/-i <chat_id> --output/-o <chat_id>
 ```
 
-#### Note:
+#### Notes:
 
-When you execute, stop and restart the bot, the messages that have been cloned will be skipped and the bot will resume from where it left off.
+1. When you execute, stop and restart the bot, the messages that have been cloned will be skipped and the bot will resume from where it left off.
+2. If you executes clonechat two times and use `--reverse` in one of them, the order messages can be break because the script save the `last_sent_message_id` and it doenst helps when switches the order.
+3. **If you only executes `python3 clonechat.py` the interactive mode will be use instead of the CLI arguments.**
 
 ### Additional Options
 
 - **Forwarding Messages:** Add the `--forward/-fwd` flag to enable message forwarding from the input chat to the output chat, assuming user permissions allow it. This option replicates the forwarding action, maintaining the original sender's information.
-- **Reverse Message Order:** Utilize the `--reverse/-rev` flag to invert the order of message cloning, starting with the oldest messages first. This can be particularly useful for chronological consistency in certain cloning scenarios.
+- **Reverse Message Order:** Utilize the `--reverse/-rev` flag to invert the order of message cloning, starting with the oldest messages first. This can be particularly useful for chronological consistency in certain cloning scenarios. (May take a while)
+- **Random Sleep** Utilize the `--sleep-range/-lr` flag to define the min and max range of seconds. The script will get a (pseudo) random number from this range and sleep (wait) seconds between each send message. Usage example: `--sleep-range 10 30` (will choice radom numbers from 10 and 30 seconds). Default range is `(0, 1)`. 
 
 ### Logging
 
