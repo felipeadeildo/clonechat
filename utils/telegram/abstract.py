@@ -1,7 +1,8 @@
-# import asyncio
 import sqlite3
+import time
 from abc import ABC, abstractmethod
 from pathlib import Path
+from random import randint
 from typing import AsyncGenerator, Union
 
 from pyrogram.client import Client
@@ -19,6 +20,8 @@ class Target(ABC):
         self.target_path = Path("chats") / str(target_id)
         self.forward_messages = extra_configs.get("forward_messages", False)
         self.reverse_messages = extra_configs.get("reverse_messages", False)
+        self.threads = extra_configs.get("threads", 1)
+        self.sleep_range = extra_configs.get("sleep_range", (0, 5))
         self.db_path = (
             self.target_path / "dump.db"
             if not extra_configs.get("db_path")
@@ -80,3 +83,13 @@ class Target(ABC):
     def _create_initial_schema(self):
         """Define an create the schema from the target messages controller db (if not exists)"""
         raise NotImplementedError
+
+    def _random_sleep(self, multiplier: int = 1):
+        time_to_sleep = randint(*self.sleep_range) * multiplier
+        time_piece = 0.01
+        while time_to_sleep > 0:
+            print(f"\rWaiting {time_to_sleep:.2f} to continue...", end="", flush=True)
+            time.sleep(time_piece)
+            time_to_sleep -= time_piece
+        else:
+            print()

@@ -110,7 +110,7 @@ class InteractiveCloneChat:
     async def __get_target_chats(self) -> tuple[Chat, Chat]:
         want_load_dialogs = is_yes_answer(
             input(
-                "Do you want to load dialogs to select from a list of dialogs (chats)? [y/n]"
+                "Do you want to load dialogs to select from a list of dialogs (chats)? [y/n] "
             )
         )
         dialogs = []
@@ -145,6 +145,9 @@ class InteractiveCloneChat:
             "reverse_messages": is_yes_answer(input("Try to Reverse messages? [y/N] ")),
             "threads": int(
                 input("How many simultaneous downloads do you want? [1-10] ")
+            ),
+            "sleep_range": list(
+                map(int, input("Enter sleep range [Example: 5 10]: ").split())
             ),
         }
 

@@ -1,4 +1,3 @@
-# import asyncio
 import logging
 import os
 from pathlib import Path
@@ -99,15 +98,27 @@ class TgChat(Target):
             else 0
         )
 
-        # TODO: Apply reverse function here if needed by self.reverse_messages
         messages_generator = self.client.get_chat_history(
-            self.target.id, offset_id=last_sent_message_id
+            self.target.id,
+            offset_id=last_sent_message_id if not self.reverse_messages else 0,
         )
+        messages_iterator = []
+        if self.reverse_messages:
+            logging.info("Reversing messages (it may take a while)")
+            async for message in messages_generator:  # type: ignore [is iterable]
+                if message.id <= last_sent_message_id:
+                    continue
+                messages_iterator.append(message)
 
-        async for message in messages_generator:  # type: ignore [is iterable]
-            if getattr(message, "service"):
-                continue
-            yield self._get_universal_message(message)
+            for message in reversed(messages_iterator):
+                if getattr(message, "service"):
+                    continue
+                yield self._get_universal_message(message)
+        else:
+            async for message in messages_generator:  # type: ignore [is iterable]
+                if getattr(message, "service"):
+                    continue
+                yield self._get_universal_message(message)
 
     def __insert_sent_message(
         self, original_message: UniversalMessage, sent_message: Message
@@ -136,8 +147,11 @@ class TgChat(Target):
         if not tg_message:
             return
 
+        friendly_sender_chat_name = self.get_friendly_chat_name(tg_message.chat)
+
+        save_path = Path("chats") / str(self.target_id) / str(tg_message.id)
         logging.info(
-            f"Sending message {self.get_message_url(tg_message)} to {self.friendly_name}"
+            f"Sending message {self.get_message_url(tg_message)} from '{friendly_sender_chat_name}' to '{self.friendly_name}' (saved in {save_path})"
         )
 
         if message.can_forward:
@@ -146,19 +160,7 @@ class TgChat(Target):
             )
             if isinstance(sent_messages, Message):
                 self.__insert_sent_message(message, sent_messages)
-            # else:
-            #     for sent_message in sent_messages:
-            #         self.__insert_sent_message(message, sent_message)
             return
-
-        save_path = Path("chats") / str(self.target_id) / str(tg_message.id)
-        save_path.mkdir(parents=True, exist_ok=True)
-        for file_path in save_path.iterdir():
-            os.remove(file_path)
-
-        logging.info(
-            f"Save Path to save media of message {self.get_message_url(tg_message)} is: {save_path}"
-        )
 
         if tg_message.media:
             media_type = tg_message.media.value
@@ -192,11 +194,13 @@ class TgChat(Target):
 
             try:
                 sent_message = await send_function(*args, **kwargs)
-            except ValueError:
-                logging.warning(
-                    "An error ocurred when trying to send the file, trying to send again..."
+                self._random_sleep()
+            except ValueError as e:
+                logging.error(
+                    f"An error ocurred when trying to send the file (Probably API Spam): {e}"
                 )
                 file_buffer.close()
+                self._random_sleep(multiplier=15)
                 return await self.send_message(message)
             else:
                 file_buffer.close()
@@ -210,6 +214,7 @@ class TgChat(Target):
             sent_message = await self.client.send_message(
                 self.target.id, tg_message.text
             )
+            self._random_sleep()
 
         if sent_message:
             self.__insert_sent_message(message, sent_message)

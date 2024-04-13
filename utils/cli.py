@@ -60,6 +60,25 @@ def get_args() -> argparse.Namespace:
         help="Reverse the message order. Default: False",
     )
 
+    clone_parser.add_argument(
+        "--threads",
+        "-t",
+        metavar="THREADS",
+        type=int,
+        default=1,
+        help="Number of threads to use. Default: 1",
+    )
+
+    clone_parser.add_argument(
+        "--sleep-range",
+        "-sr",
+        metavar="SLEEP_RANGE",
+        type=int,
+        nargs=2,
+        default=(0, 1),
+        help="Range of sleep time in seconds. Default: (0, 1)\nHow to use it: -sr 5 10 means sleep between 5 and 10 seconds",
+    )
+
     # CleanUP Command
     subparsers.add_parser("cleanup", help="Cleanup Chats")
 
