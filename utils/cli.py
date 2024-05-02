@@ -1,6 +1,8 @@
 import argparse
 from typing import Union
 
+from utils.base import MEDIA_TYPES
+
 
 def __argtype(value: str) -> Union[int, str]:
     """Parse the command line arguments
@@ -77,6 +79,24 @@ def get_args() -> argparse.Namespace:
         nargs=2,
         default=(0, 1),
         help="Range of sleep time in seconds. Default: (0, 1)\nHow to use it: -sr 5 10 means sleep between 5 and 10 seconds",
+    )
+
+    clone_parser.add_argument(
+        "--send-text-messages",
+        "-stm",
+        action="store_true",
+        default=False,
+        help="Allow the bot send text messages (message with no media). Default: False",
+    )
+
+    clone_parser.add_argument(
+        "--media-types",
+        "-mt",
+        metavar="MEDIA_TYPE",
+        type=str,
+        nargs="+",
+        default=MEDIA_TYPES,
+        help=f"Media types that the bot is allowed to send. Default: {", ".join(MEDIA_TYPES)}",
     )
 
     # CleanUP Command

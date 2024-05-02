@@ -9,7 +9,7 @@ from typing import List
 # from pyrogram.raw.types.input_peer_channel import InputPeerChannel
 from pyrogram.types import Chat, Dialog
 
-from utils.base import get_friendly_chat_name, is_yes_answer
+from utils.base import MEDIA_TYPES, get_friendly_chat_name, is_yes_answer
 from utils.cli import get_args
 from utils.client import get_client
 from utils.telegram.targets import get_target
@@ -137,6 +137,20 @@ class InteractiveCloneChat:
     #         channel=channel, offset_date=0, offset_id=0, offset_topic=0, limit=100  # type: ignore
     #     )
 
+    def __get_media_types(self):
+        print("Select the media types you want to clone [Example: 1 2 4]: ")
+        for i, media_type in enumerate(MEDIA_TYPES, 1):
+            print(f"{i}. {media_type}")
+        return tuple(
+            map(
+                lambda x: MEDIA_TYPES[int(x) - 1],
+                input(
+                    "Enter media types (separated by space) or Press Enter for All:\n>> "
+                ).split()
+                or range(1, len(MEDIA_TYPES) + 1),
+            )
+        )
+
     async def run(self):
         self.input_chat, self.output_chat = await self.__get_target_chats()
 
@@ -149,6 +163,10 @@ class InteractiveCloneChat:
             "sleep_range": list(
                 map(int, input("Enter sleep range [Example: 5 10]: ").split())
             ),
+            "send_text_messages": is_yes_answer(
+                input("Do you want to send text messages? [y/N] ")
+            ),
+            "media_types": self.__get_media_types(),
         }
 
         self.input = await get_target(self.client, chat=self.input_chat, **config)

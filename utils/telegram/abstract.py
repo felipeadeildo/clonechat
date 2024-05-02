@@ -8,6 +8,8 @@ from typing import AsyncGenerator, Union
 from pyrogram.client import Client
 from pyrogram.types import Message
 
+from utils.base import MEDIA_TYPES
+
 from .message import UniversalMessage
 
 
@@ -22,6 +24,8 @@ class Target(ABC):
         self.reverse_messages = extra_configs.get("reverse_messages", False)
         self.threads = extra_configs.get("threads", 1)
         self.sleep_range = extra_configs.get("sleep_range", (0, 5))
+        self.send_text_messages = extra_configs.get("send_text_messages", False)
+        self.media_types = extra_configs.get("media_types", MEDIA_TYPES)
         self.db_path = (
             self.target_path / "dump.db"
             if not extra_configs.get("db_path")

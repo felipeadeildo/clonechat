@@ -115,11 +115,23 @@ class TgChat(Target):
             for message in reversed(messages_iterator):
                 if getattr(message, "service"):
                     continue
+                if not self.send_text_messages and message.media is None:
+                    continue
+                if media := message.media:
+                    media_type = str(media.value)
+                    if media_type not in self.media_types:
+                        continue
                 yield self._get_universal_message(message)
         else:
             async for message in messages_generator:  # type: ignore [is iterable]
                 if getattr(message, "service"):
                     continue
+                if not self.send_text_messages and message.media is None:
+                    continue
+                if media := message.media:
+                    media_type = str(media.value)
+                    if media_type not in self.media_types:
+                        continue
                 yield self._get_universal_message(message)
 
     def __insert_sent_message(
