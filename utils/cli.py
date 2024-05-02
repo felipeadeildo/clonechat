@@ -96,7 +96,7 @@ def get_args() -> argparse.Namespace:
         type=str,
         nargs="+",
         default=MEDIA_TYPES,
-        help=f"Media types that the bot is allowed to send. Default: {", ".join(MEDIA_TYPES)}",
+        help=f"Media types that the bot is allowed to send. Default: {', '.join(MEDIA_TYPES)}",
     )
 
     # CleanUP Command
