@@ -6,6 +6,8 @@ from typing import Optional
 from pyrogram.client import Client
 from pyrogram.types import Chat, ChatPreview, Message
 
+from utils.client import get_client
+
 from .abstract import Target
 from .message import UniversalMessage
 
@@ -210,6 +212,8 @@ class TgChat(Target):
                 )
                 file_buffer.close()
                 self._random_sleep(multiplier=15)
+                await self.__restart_client()
+
                 return await self.send_message(message)
             else:
                 file_buffer.close()
@@ -227,6 +231,10 @@ class TgChat(Target):
 
         if sent_message:
             self.__insert_sent_message(message, sent_message)
+
+    async def __restart_client(self):
+        await self.client.disconnect()
+        self.client = await get_client()
 
 
 async def get_target(
