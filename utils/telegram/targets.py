@@ -160,7 +160,9 @@ class TgChat(Target):
                     self.target.id, message.chat_id, tg_message.id
                 )
             except ValueError:
-                logging.error(f"The message {self.get_message_url(tg_message)} cannot be forwarded. Skipping.")
+                logging.error(
+                    f"The message {self.get_message_url(tg_message)} cannot be forwarded. Skipping."
+                )
                 return
             if isinstance(sent_messages, Message):
                 self.__insert_sent_message(message, sent_messages)
@@ -195,6 +197,9 @@ class TgChat(Target):
             kwargs = {"caption": tg_message.text, "progress": custom_callback}
             if media_type not in ("photo", "audio", "sticker"):
                 kwargs["file_name"] = file_path.name
+
+            if media_type in ("sticker",):
+                kwargs.pop("caption", None)
 
             try:
                 sent_message = await send_function(*args, **kwargs)
