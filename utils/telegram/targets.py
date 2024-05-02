@@ -155,9 +155,13 @@ class TgChat(Target):
         )
 
         if message.can_forward:
-            sent_messages = await self.client.copy_message(
-                self.target.id, message.chat_id, tg_message.id
-            )
+            try:
+                sent_messages = await self.client.copy_message(
+                    self.target.id, message.chat_id, tg_message.id
+                )
+            except ValueError:
+                logging.error(f"The message {self.get_message_url(tg_message)} cannot be forwarded. Skipping.")
+                return
             if isinstance(sent_messages, Message):
                 self.__insert_sent_message(message, sent_messages)
             return
