@@ -8,7 +8,7 @@ from typing import AsyncGenerator, Union
 from pyrogram.client import Client
 from pyrogram.types import Message
 
-from utils.base import MEDIA_TYPES
+from constants import MEDIA_TYPES
 
 from .message import UniversalMessage
 

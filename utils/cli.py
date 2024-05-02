@@ -1,7 +1,7 @@
 import argparse
 from typing import Union
 
-from utils.base import MEDIA_TYPES
+from constants import MEDIA_TYPES
 
 
 def __argtype(value: str) -> Union[int, str]:

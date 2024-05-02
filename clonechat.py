@@ -9,10 +9,11 @@ from typing import List
 # from pyrogram.raw.types.input_peer_channel import InputPeerChannel
 from pyrogram.types import Chat, Dialog
 
-from utils.base import MEDIA_TYPES, get_friendly_chat_name, is_yes_answer
+from utils.base import get_friendly_chat_name, is_yes_answer
 from utils.cli import get_args
 from utils.client import get_client
 from utils.telegram.targets import get_target
+from constants import MEDIA_TYPES
 
 try:
     import uvloop

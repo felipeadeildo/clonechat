@@ -8,9 +8,6 @@ from .telegram.abstract import Target
 from .telegram.targets import TgChat
 
 
-MEDIA_TYPES = ["photo", "video", "document", "audio", "voice", "sticker", "video_note"]
-"""Media types that can be handled by the bot and telegram API"""
-
 def get_filename(media: Optional[MessageMediaType]) -> str:
     """Get the filename of the media
 
