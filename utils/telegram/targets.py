@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 from pyrogram.client import Client
+from pyrogram.errors.exceptions.flood_420 import FloodWait
 from pyrogram.types import Chat, ChatPreview, Message
 
 from utils.client import get_client
@@ -178,6 +179,13 @@ class TgChat(Target):
                     f"The message {self.get_message_url(tg_message)} cannot be forwarded. Skipping."
                 )
                 return
+            except FloodWait as e:
+                logging.error(
+                    f"The message {self.get_message_url(tg_message)} cannot be forwarded beacause of FloodWait. Error: {e}"
+                )
+                self._random_sleep(multiplier=15)
+                await self.__restart_client()
+                return await self.send_message(message)
             if isinstance(sent_messages, Message):
                 self.__insert_sent_message(message, sent_messages)
             return
