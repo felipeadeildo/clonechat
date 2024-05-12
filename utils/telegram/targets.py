@@ -1,6 +1,7 @@
 import logging
 import os
 from pathlib import Path
+import time
 from typing import Optional
 
 from pyrogram.client import Client
@@ -253,7 +254,8 @@ class TgChat(Target):
             self.__insert_sent_message(message, sent_message)
 
     async def __restart_client(self):
-        await self.client.disconnect()
+        await self.client.stop()
+        time.sleep(4)
         self.client = await get_client()
 
 
