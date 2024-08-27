@@ -218,7 +218,7 @@ class TgChat(Target):
             send_function = getattr(self.client, f"send_{media_type}")
             args = [self.target.id, file_buffer]
             kwargs = {"caption": tg_message.text, "progress": custom_callback}
-            if media_type not in ("photo", "audio", "sticker"):
+            if media_type not in ("photo", "voice", "audio", "sticker"):
                 kwargs["file_name"] = file_path.name
 
             if media_type in ("sticker",):
